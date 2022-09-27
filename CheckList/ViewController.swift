@@ -6,19 +6,21 @@
 //
 
 import UIKit
-
+import CoreData
 class ViewController: UITableViewController {
 
     var Init = [Item]()
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Item.plist")
+    var selectedCategory: Categories? {
+        didSet{
+            loadItems()
+        }
+    }
+    
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        loadItems()
 
-        
-        
     }
 
     override func numberOfSections(in tableView: UITableView) -> Int {
@@ -39,7 +41,7 @@ class ViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoCell", for: indexPath)
         
-        cell.textLabel?.text = Init[indexPath.row].name
+        cell.textLabel?.text = Init[indexPath.row].title
         
         cell.accessoryType = Init[indexPath.row].done ? .checkmark : .none
         
@@ -57,9 +59,11 @@ class ViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             
-            let newItem = Item()
-            newItem.name = textField.text!
-            
+           
+            let newItem = Item(context: self.context)
+            newItem.title = textField.text!
+            newItem.done = false
+            newItem.category = self.selectedCategory
             self.Init.append(newItem)
             self.saveItems()
            
@@ -73,23 +77,56 @@ class ViewController: UITableViewController {
     }
     
     func saveItems(){
-        let encoder = PropertyListEncoder()
+       
         do{
-            let data = try encoder.encode(self.Init)
-            try data.write(to: self.dataFilePath!)
+            try context.save()
         } catch {
-            print("error encoding the item")
+           print("error saving data")
         }
         self.tableView.reloadData()
     }
     
-    func loadItems(){
-        if let data = try? Data(contentsOf: dataFilePath!){
-            let decoder = PropertyListDecoder()
-            do{
-            Init = try decoder.decode([Item].self, from: data)
-            } catch {
-                print("error decoding the item")
+    func loadItems(with request: NSFetchRequest<Item> = Item.fetchRequest(), predicate: NSPredicate? = nil){
+        //let request: NSFetchRequest<Item> = Item.fetchRequest()
+        
+        let categoryPredicate = NSPredicate(format: "category.name MATCHES %@", selectedCategory!.name!)
+        if let additionalPredicate = predicate {
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate, additionalPredicate])
+        } else {
+            request.predicate = categoryPredicate
+        }
+
+       
+        do {
+        Init = try context.fetch(request)
+        } catch {
+            print("error fetching data")
+        }
+        tableView.reloadData()
+    }
+    
+   
+}
+//MARK: - search bar methods
+extension ViewController: UISearchBarDelegate{
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request: NSFetchRequest<Item> = Item.fetchRequest()
+        let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        request.predicate = predicate
+       
+        
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        loadItems(with: request,predicate: predicate)
+        
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadItems()
+            
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
             }
         }
     }
