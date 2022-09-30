@@ -9,11 +9,12 @@ import UIKit
 import RealmSwift
 import ChameleonFramework
 
-class ViewController: SwipeTableViewController {
+class ViewController: SwipeTableViewController, UINavigationBarDelegate {
 
     @IBOutlet weak var searchBar: UISearchBar!
     var items: Results<Item>?
     let realm = try! Realm()
+    var index: IndexPath?
     var selectedCategory: Category? {
         didSet{
             loadItems()
@@ -61,10 +62,13 @@ class ViewController: SwipeTableViewController {
             } catch {
                 print("error updating item")
             }
-            
+
         }
+       
         tableView.reloadData()
     }
+
+
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
@@ -78,6 +82,7 @@ class ViewController: SwipeTableViewController {
         let color = UIColor(hexString: selectedCategory!.color)?.darken(byPercentage: CGFloat(indexPath.row)/CGFloat(items!.count))
         cell.backgroundColor = color
         cell.textLabel?.textColor = ContrastColorOf(color!, returnFlat: true)
+        cell.tintColor = ContrastColorOf(color!, returnFlat: true)
         
         return cell
         
